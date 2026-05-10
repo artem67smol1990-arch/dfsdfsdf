@@ -106,5 +106,35 @@ module WebConsole
 
       assert_equal "=> WebConsole::SessionTest::ValueAwareError\n", session.eval("self")
     end
+
+    test "evicts oldest sessions when max_sessions limit is reached" do
+      previous_max = Session.max_sessions
+      Session.max_sessions = 2
+
+      Session.inmemory_storage.clear
+      first  = Session.new([[binding]])
+      second = Session.new([[binding]])
+      third  = Session.new([[binding]])
+
+      assert_equal 2, Session.inmemory_storage.size
+      assert_nil Session.find(first.id)
+      assert_equal second, Session.find(second.id)
+      assert_equal third, Session.find(third.id)
+    ensure
+      Session.max_sessions = previous_max
+    end
+
+    test "max_sessions = nil disables eviction" do
+      previous_max = Session.max_sessions
+      Session.max_sessions = nil
+
+      Session.inmemory_storage.clear
+      sessions = Array.new(10) { Session.new([[binding]]) }
+
+      assert_equal 10, Session.inmemory_storage.size
+      sessions.each { |s| assert_equal s, Session.find(s.id) }
+    ensure
+      Session.max_sessions = previous_max
+    end
   end
 end

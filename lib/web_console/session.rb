@@ -11,7 +11,24 @@ module WebConsole
   # error pages only, as currently, this is the only client that needs to do
   # that.
   class Session
+    # In-memory store of recent sessions, keyed by id. Bounded by
+    # +max_sessions+ to prevent unbounded growth in long-running development
+    # processes: every captured session retains stack-frame +Binding+ objects
+    # which pin the entire lexical scope (including +Rails.application.routes+
+    # via the controller +self+), so leaving the store unbounded leaks a full
+    # route tree generation per dev-mode exception.
     cattr_reader :inmemory_storage, default: {}
+
+    # Maximum number of concurrently retained sessions. When this many
+    # sessions are stored, inserting a new one evicts the oldest by
+    # insertion order (Ruby Hashes preserve insertion order).
+    #
+    # Set to a positive Integer to bound retention, or +nil+ to disable
+    # eviction entirely (legacy behaviour, leaks indefinitely).
+    cattr_accessor :max_sessions, default: 5
+
+    INMEMORY_STORAGE_MUTEX = Mutex.new
+    private_constant :INMEMORY_STORAGE_MUTEX
 
     class << self
       # Finds a persisted session in memory by its id.
@@ -19,7 +36,7 @@ module WebConsole
       # Returns a persisted session if found in memory.
       # Raises NotFound error unless found in memory.
       def find(id)
-        inmemory_storage[id]
+        INMEMORY_STORAGE_MUTEX.synchronize { inmemory_storage[id] }
       end
 
       # Create a Session from an binding or exception in a storage.
@@ -74,7 +91,18 @@ module WebConsole
     private
 
       def store_into_memory
-        inmemory_storage[id] = self
+        INMEMORY_STORAGE_MUTEX.synchronize do
+          inmemory_storage[id] = self
+          evict_oldest_sessions
+        end
+      end
+
+      def evict_oldest_sessions
+        limit = self.class.max_sessions
+        return unless limit && limit > 0
+
+        excess = inmemory_storage.size - limit
+        excess.times { inmemory_storage.shift } if excess > 0
       end
   end
 end

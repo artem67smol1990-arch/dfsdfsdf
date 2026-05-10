@@ -103,6 +103,30 @@ Rails.application.configure do
 end
 ```
 
+### config.web_console.max_sessions
+
+Web Console retains the most recent error sessions in memory so that the
+in-browser REPL can be re-attached to a captured stack frame. Each retained
+session pins all stack-frame `Binding` objects, which in turn keep the entire
+lexical scope alive — including `Rails.application.routes`, the controller
+instance, and everything those reference. In long-running development
+processes this previously grew without bound, leaking a full route tree
+generation per dev-mode exception.
+
+Sessions are now evicted in insertion order once the configured limit is
+reached. The default keeps the **5** most recent sessions, which is enough
+to keep the in-browser console interactable while keeping memory bounded.
+
+```ruby
+Rails.application.configure do
+  # Keep the 20 most recent sessions instead of the default 5
+  config.web_console.max_sessions = 20
+
+  # Or disable eviction entirely (legacy unbounded behaviour, not recommended)
+  config.web_console.max_sessions = nil
+end
+```
+
 ### config.web_console.template_paths
 
 If you want to style the console yourself, then you can place `style.css` at a

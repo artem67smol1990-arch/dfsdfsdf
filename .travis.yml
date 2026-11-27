@@ -1,12 +1,40 @@
 language: ruby
+
 rvm:
   - 1.9.3
   - 2.0.0
-  - jruby-19mode
-  - rbx-19mode
-matrix:
-  allow_failures:
-    - rvm: jruby-19mode
-    - rvm: rbx-19mode
+  - 2.1
+  - 2.2
+  - ruby-head
+  - rbx-2
+  - jruby
+
+gemfile:
+  - gemfiles/Gemfile-4-0-stable
+  - gemfiles/Gemfile-4-1-stable
+  - gemfiles/Gemfile-4-2-stable
+  - Gemfile
+
+env:
+  global:
+    - JRUBY_OPTS=--dev
+    - TEST_SUITE=test
+
+sudo: false
+
 before_script:
   - RAILS_ENV=test bundle exec rake --rakefile=test/dummy/Rakefile db:setup
+
+script:
+  - bundle exec rake ${TEST_SUITE}
+
+matrix:
+  include:
+    - gemfile: gemfiles/Gemfile-4-0-stable
+      env: TEST_SUITE=test:templates
+      rvm: 1.9.3
+  allow_failures:
+    - rvm: ruby-head
+    - rvm: rbx-2
+    - rvm: jruby
+    - gemfile: Gemfile

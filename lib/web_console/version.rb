@@ -1,3 +1,3 @@
 module WebConsole
-  VERSION = '1.0.4'
+  VERSION = '2.3.0'
 end

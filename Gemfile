@@ -2,20 +2,16 @@ source 'https://rubygems.org'
 
 gemspec
 
-group :development do
-  gem 'puma'
+gem 'rails', github: 'rails/rails'
+gem 'arel', github: 'rails/arel'
 
-  # Only require this one explicitly.
-  gem 'pry-rails', require: false
+platforms :jruby do
+  gem 'activerecord-jdbcsqlite3-adapter'
+  gem 'binding_of_caller', '0.7.3.pre1'
+end
 
-  platforms :jruby do
-    gem 'activerecord-jdbcsqlite3-adapter'
-  end
-
-  platforms :ruby do
-    gem 'thin'
-    gem 'sqlite3'
-  end
+platforms :ruby do
+  gem 'sqlite3'
 end
 
 group :test do

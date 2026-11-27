@@ -1,289 +1,231 @@
 <p align=right>
   Documentation for:
-  <a href=https://github.com/rails/web-console/tree/v0.1.0>v0.1.0</a>
-  <a href=https://github.com/rails/web-console/tree/v0.2.0>v0.2.0</a>
-  <a href=https://github.com/rails/web-console/tree/v0.3.0>v0.3.0</a>
-  <a href=https://github.com/rails/web-console/tree/v0.4.0>v0.4.0</a>
+  <a href=https://github.com/rails/web-console/tree/v2.0.0>v2.0.0</a>
+  <a href=https://github.com/rails/web-console/tree/v2.1.0>v2.1.0</a>
+  <a href=https://github.com/rails/web-console/tree/v2.1.1>v2.1.1</a>
+  <a href=https://github.com/rails/web-console/tree/v2.1.2>v2.1.2</a>
+  <a href=https://github.com/rails/web-console/tree/v2.1.3>v2.1.3</a>
 </p>
 
-Web Console [![Version](https://badge.fury.io/rb/web-console.png)](http://badge.fury.io/rb/web-console) [![Travis](https://travis-ci.org/rails/web-console.png)](https://travis-ci.org/rails/web-console)
-===========
+# Web Console [![Build Status](https://travis-ci.org/rails/web-console.svg?branch=master)](https://travis-ci.org/rails/web-console)
 
-Running `rails console` is quite handy. Having your Rails application loaded in
-an interactive session is a great debugging tool. Sometimes, though, you can't
-easily access it, or maybe you want to easily share your session with a friend
-without configuring a remote desktop server.
+_Web Console_ is a debugging tool for your Ruby on Rails applications.
 
-This is where _Web Console_ comes to play. It gives you the same
-`rails console` experience, but in the browser. Its not just a tool that
-let's you evaluate Ruby code, there are a lot of those. Its a [VT100]
-compatible terminal.
+- [Installation](#installation)
+- [Runtime](#runtime)
+  - [CRuby](#cruby)
+  - [JRuby](#jruby)
+  - [Rubinius](#rubinius)
+- [Configuration](#configuration)
+- [Usage](#usage)
+- [FAQ](#faq)
+- [Credits](#credits)
 
-![demo](http://f.cl.ly/items/3N3K412T381u2w360F2M/Screen%20Shot%202013-09-06%20at%208.24.57%20PM.png)
+## Installation
 
-You can see _Web Console_ in action at this [video].
-
-Requirements
-------------
-
-_Web Console_ has been tested on the following rubies.
-
-* _MRI Ruby_ 2.0.0
-* _MRI Ruby_ 1.9.3
-* _JRuby_ 1.7.4
-
-_Rubunius_ in 1.9 mode may work, but it hasn't been tested.
-
-_Web Console_ has been built explicitly for _Rails 4_. Check out the
-[web-console-rails3] project for a _Rails 3_ compatible build.
-
-Installation
-------------
-
-To install it in your current application, add the following to your `Gemfile`.
+_Web Console_ is meant to work as a Rails plugin. To install it in your current
+application, add the following to your `Gemfile`.
 
 ```ruby
 group :development do
-  gem 'web-console'
+  gem 'web-console', '~> 2.0'
 end
 ```
 
 After you save the `Gemfile` changes, make sure to run `bundle install` and
 restart your server for the _Web Console_ to kick in.
 
-By default, it should be available in your development environment under
-`/console`. The route is not automatically mounted in a production environment
-and we strongly encourage you to keep it that way.
+## Runtime
 
-Configuration
--------------
+_Web Console_ uses [John Mair]'s [binding_of_caller] to spawn a console in a
+specific binding. This comes at the price of limited Ruby runtime support.
 
-> Today we have learned in the agony of war that great power involves great
-> responsibility.
->
-> -- <cite>Franklin D. Roosevelt</cite>
+### CRuby
 
-_Web Console_ is a powerful tool. It allows you to execute arbitrary code on
-the server, so you should be very careful, who you give access to it.
+CRuby 1.9.2 and below is **not** supported.
+
+### JRuby
+
+JRuby needs to run in interpreted mode. You can enable it by:
+
+```bash
+export JRUBY_OPTS=-J-Djruby.compile.mode=OFF
+
+# If you run JRuby 1.7.12 and above, you can use:
+export JRUBY_OPTS=--dev
+```
+
+An unstable version of [binding_of_caller] is needed as the latest stable one
+won't compile on _JRuby_. To install it, put the following in your application
+`Gemfile`:
+
+```ruby
+group :development do
+  gem 'binding_of_caller', '0.7.3.pre1'
+end
+```
+
+Only _JRuby_ 1.7, is supported (no JRuby 9K support at the moment).
+
+### Rubinius
+
+Internal errors like `ZeroDevisionError` aren't caught.
+
+## Usage
+
+The web console allows you to create an interactive Ruby session in your
+browser. Those sessions are launched automatically in case on an error, but
+they can also be launched manually in in any page.
+
+For example, calling `console` in a view will display a console in the current
+page in the context of the view binding.
+
+```html
+<% console %>
+```
+
+Calling `console` in a controller will result in a console in the context of
+the controller action:
+
+```ruby
+class PostsController < ApplicationController
+  def new
+    console
+    @post = Post.new
+  end
+end
+```
+
+Only one `console` invocation is allowed per request. If you happen to have
+multiple ones, a `WebConsole::DoubleRenderError` is raised.
+
+## Configuration
+
+_Web Console_ allows you to execute arbitrary code on the server, so you
+should be very careful, who you give access to.
 
 ### config.web_console.whitelisted_ips
 
-By default, only requests coming from `127.0.0.1` are allowed.
+By default, only requests coming from IPv4 and IPv6 localhosts are allowed.
 
 `config.web_console.whitelisted_ips` lets you control which IP's have access to
 the console.
 
-Let's say you want to share your console with just that one roommate, you like
-and his/her IP is `192.168.0.100`.
+You can whitelist single IP's or whole networks. Say you want to share your
+console with `192.168.0.100`. You can do this:
 
 ```ruby
 class Application < Rails::Application
-  config.web_console.whitelisted_ips = %w( 127.0.0.1 192.168.0.100 )
+  config.web_console.whitelisted_ips = '192.168.0.100'
 end
 ```
 
-From the example, you can guess that `config.web_console.whitelisted_ips`
-accepts an array of ip addresses, provided as strings. An important thing to
-note here is that, we won't push `127.0.0.1` if you manually set the option!
-
-Now let's assume you like all of your roommates. Instead of enumerating their
-IP's, you can whitelist the whole private network. Now every time their IP's
-change, you'll have them covered.
+If you want to whitelist the whole private network, you can do:
 
 ```ruby
-class Application < Rails::Application
+Rails.application.configure do
   config.web_console.whitelisted_ips = '192.168.0.0/16'
 end
 ```
 
-You can see that `config.web_console.whitelisted_ips` accepts plains strings
-too. More than that, they can cover whole networks.
+Take a note that IPv4 and IPv6 localhosts are always allowed. This wasn't the
+case in 2.0.
 
-Again, note that this network doesn't allow `127.0.0.1`. If you want to access
-the console, you have to do so from it's external IP or add `127.0.0.1` to the
-mix.
+### config.web_console.whiny_requests
 
-### config.web_console.default_mount_path
+When a console cannot be shown for a given IP address or content type, a
+messages like the following is printed in the server logs:
 
-By default, the console will be automatically mounted on `/console`.
+> Cannot render console from 192.168.1.133! Allowed networks:
+> 127.0.0.0/127.255.255.255, ::1
 
-_(This happens only in the development and test environments!)_.
-
-Say you want to mount the console to `/debug`, so you can more easily remember
-where to go, when your application needs debugging.
+If you don't wanna see this message anymore, set this option to `false`:
 
 ```ruby
-class Application < Rails::Application
-  config.web_console.default_mount_path = '/debug'
+Rails.application.configure do
+  config.web_console.whiny_requests = false
 end
 ```
 
-### config.web_console.automount
+### config.web_console.template_paths
 
-If you want to explicitly mount `WebConsole::Engine`, you can prevent the
-automatic mount by setting this option to `false`.
-
-### config.web_console.command
-
-By default, _Web Console_ will run `Rails.root.join('bin/rails console)` to
-spawn you a fresh Rails console. If the relative `bin/rails` doesn't exist,
-`rails console` will be run instead.
-
-One of the advantages of being a [VT100] emulator is that _Web Console_ can run
-most of your terminal applications.
-
-Let say _(for some reason)_ you can't run SSH on your server machine. You can
-run [`login`][login] instead to let users sign into the host system.
+If you wanna style the console yourself, you can place `style.css` at a
+directory pointed by `config.web_console.template_paths`:
 
 ```ruby
-class Application < Rails::Application
-  # You have to run /bin/login as root. That should worry you and you may work
-  # around it by running ssh connecting to the same machine.
-  config.web_console.command = 'sudo /bin/login'
+Rails.application.configure do
+  config.web_console.template_paths = 'app/views/web_console'
 end
 ```
 
-_Poor man's solution to SSH._ ![boom](http://f.cl.ly/items/3n2h0p1w0B261u2d201b/boom.png)
+You may wanna check the [templates] folder at the source tree for the files you
+may override.
 
-**If you ever decide to use _Web Console_ that way, use SSL to encrypt the
-traffic, otherwise all the input (including the negotiated username and
-password) can be easily sniffed!**
+### config.web_console.mount_point
 
-### config.web_console.term
-
-By default, the _Web Console_ terminal will report itself as `xterm-color`. You
-can override this option to change that.
-
-### config.web_console.timeout
-
-You may have noticed that _Web Console_ client sends a lot of requests to the
-server. And by a lot, we really mean, **a lot** _(every few milliseconds)_.
-We do this since we can't reliably predict when the output of your command
-execution will come available, so we poll for it.
-
-This option control how much will the server wait on the process output pipe
-for input, before signalling the client to try again.
-
-Maybe some day Web Sockets or SSE can be used for more efficient communication.
-Until that day, you can use long-polling. To enable it, use [Puma] as your
-development server and add the following to your configuration.
+Usually the middleware of _Web Console_ is mounted at `/__web_console`.
+If you wanna change the path for some reasons, you can specify it
+by `config.web_console.mount_point`:
 
 ```ruby
-class Application < Rails::Application
-  # You have to explicitly enable the concurrency, as in development mode,
-  # the falsy config.cache_classes implies no concurrency support.
-  #
-  # The concurrency is enabled by removing the Rack::Lock middleware, which
-  # wraps each request in a mutex, effectively making the request handling
-  # synchronous.
-  config.allow_concurrency = true
-
-  # For long-polling, 45 seconds timeout for the development server seems
-  # reasonable. You may want to experiment with the value.
-  config.web_console.timeout = 45.seconds
+Rails.application.configure do
+  config.web_console.mount_point = '/path/to/web_console'
 end
 ```
 
-Styling
--------
+## FAQ
 
-If you would like to style the terminal a bit different than the default
-appearance, you can do so with the following options.
+### Where did /console go?
 
-### config.web_console.style.colors
+The remote terminal emulator was extracted in its own gem that is no longer
+bundled with _Web Console_.
 
-_Web Console_ supports up to 256 color themes, though most of the common
-terminal themes are usually 16 colors.
+If you miss this feature, check out [rvt].
 
-The default color theme is a white-on-black theme called `light`. For
-different appearance you may want to experiment with the other included color
-themes.
+### Why I constantly get unavailable session errors?
 
-- `monokai` _the default Sublime Text colors_
-- `solarized_dark` _light version of the common solarized colors_
-- `solarized_light` _dark version of the common solarized colors_
-- `tango` _theme based on the tango colors_
-- `xterm` _the standard xterm theme_
+All of _Web Console_ sessions are stored in memory. If you happen to run on a
+multi-process server (like Unicorn) you may get unavailable session errors
+while the server is still running. This is because a request may hit a
+different worker (process) that doesn't have the desired session in memory.
 
-If you would like to use a custom theme, you may do so with the following
-syntax.
+To avoid that, if you use such servers in development, configure them so they
+server requests only out of one process.
+
+### How to inspect local and instance variables?
+
+The interactive console executes Ruby code. Invoking `instance_variables` and
+`local_variables` will give you what you want.
+
+### Why does console only appear on error pages but not when I call it?
+
+This can be happening if you are using `Rack::Deflater`. Be sure that
+`WebConsole::Middleware` is used after `Rack::Deflater`. The easiest way to do
+this is to insert `Rack::Deflater` as early as possible
 
 ```ruby
-class Application < Rails::Application
-  # First, you have to define and register your custom color theme. Each color
-  # theme is mapped to a name.
-  WebConsole::Colors.register_theme(:custom) do |c|
-    # The most common color themes are the 16 colors one. They are built from 3
-    # parts.
-
-    # 8 darker colors.
-    c.add '#000000'
-    c.add '#cd0000'
-    c.add '#00cd00'
-    c.add '#cdcd00'
-    c.add '#0000ee'
-    c.add '#cd00cd'
-    c.add '#00cdcd'
-    c.add '#e5e5e5'
-
-    # 8 lighter colors.
-    c.add '#7f7f7f'
-    c.add '#ff0000'
-    c.add '#00ff00'
-    c.add '#ffff00'
-    c.add '#5c5cff'
-    c.add '#ff00ff'
-    c.add '#00ffff'
-    c.add '#ffffff'
-
-    # Background and foreground colors.
-    c.background '#ffffff'
-    c.foreground '#000000'
-  end
-
-  # Now you have to tell Web Console to actually use it.
-  config.web_console.style.colors = :custom
+Rails.application.configure do
+  config.middleware.insert(0, Rack::Deflater)
 end
 ```
 
-### config.web_console.style.font
+### Why I'm getting an undefined method `web_console`?
 
-You may also change the font, which is following the CSS font property syntax.
-By default it is `large DejaVu Sans Mono, Liberation Mono, monospace`.
+Make sure you configuration lives in `config/environments/development.rb`.
 
-Trial
------
+## Credits
 
-If you want to try the web-console, without having to go through the trouble of
-installing it, we provide a [Docker] container that does that for you.
+* Shoutout to [Charlie Somerville] for [better_errors] and [this] code.
+* Kudos to [John Mair] for [binding_of_caller].
+* Thanks to [Charles Oliver Nutter] for all the _JRuby_ feedback.
+* Hugs and kisses to all of our [contributors].
 
-To try it, install [Docker] first and then paste the following snippet in your
-shell.
-
-```bash
-docker build -t rails/web-console github.com/rails/web-console && docker run -i -t rails/web-console
-```
-
-FAQ
----
-
-### I'm running JRuby and the console doesn't load.
-
-**TL;DR** Give it a bit of time, it will load.
-
-While spawning processes is relatively cheap on _MRI_, this is not the case in
-_JRuby_. Spawning another process is slow. Spawning another **JRuby** process
-is even slower. Read more about the problem at the _JRuby_ [wiki].
-
-### Changing the colors is broken.
-
-Some of the style sheets may be cached on the file system. Run
-`rake tmp:cache:clear` to clear those up.
-
-  [Docker]: http://www.docker.io/
-  [Puma]: http://puma.io/
-  [VT100]: http://en.wikipedia.org/wiki/VT100
-  [login]: http://linux.die.net/man/1/login
-  [video]: http://www.youtube.com/watch?v=zjuJRXCLkHk
-  [web-console-rails3]: https://github.com/gsamokovarov/web-console-rails3
-  [wiki]: https://github.com/jruby/jruby/wiki/Improving-startup-time#avoid-spawning-sub-rubies
+[better_errors]: https://github.com/charliesome/better_errors
+[binding_of_caller]: https://github.com/banister/binding_of_caller
+[Charlie Somerville]: https://github.com/charliesome
+[John Mair]: https://github.com/banister
+[Charles Oliver Nutter]: https://github.com/headius
+[templates]: https://github.com/rails/web-console/tree/master/lib/web_console/templates
+[this]: https://github.com/rails/web-console/blob/master/lib/web_console/integration/cruby.rb#L20-L32
+[rvt]: https://github.com/gsamokovarov/rvt
+[contributors]: https://github.com/rails/web-console/graphs/contributors

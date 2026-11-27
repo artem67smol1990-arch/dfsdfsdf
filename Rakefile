@@ -5,8 +5,11 @@ rescue LoadError
 end
 
 require 'socket'
-require 'active_support/core_ext/string/strip'
 require 'rake/testtask'
+require 'tmpdir'
+require 'securerandom'
+require 'json'
+require 'web_console/testing/erb_precompiler'
 
 EXPANDED_CWD = File.expand_path(File.dirname(__FILE__))
 
@@ -17,32 +20,8 @@ Rake::TestTask.new(:test) do |t|
   t.verbose = false
 end
 
-# Just ignore this if rake is not runned from the current directory, as is the
-# case with docker's container. BUNDLE_GEMFILE won't do for our case, since the
-# Gemfile references gemspec.
-Bundler::GemHelper.install_tasks if defined? Bundler::GemHelper
+Dir['lib/web_console/tasks/**/*.rake'].each { |task| load task  }
 
-namespace :docker do
-  task :sync do
-    Dir.chdir(EXPANDED_CWD) do
-      sh 'git fetch && git reset --hard origin/master', verbose: false
-    end
-  end
-
-  task run: :sync do
-    # Generally, the first ipv4 private address is how we would access the
-    # docker container from the current machine.
-    container_ip = Socket.ip_address_list.find(&:ipv4_private?).ip_address
-
-    puts <<-NOTICE.strip_heredoc
-      Go to http://#{container_ip}:3000/console to preview web-console.
-      If it's not showing, please give a few seconds for the server to start.
-    NOTICE
-
-    Dir.chdir("#{EXPANDED_CWD}/test/dummy") do
-      sh 'rails server', verbose: false
-    end
-  end
-end
+Bundler::GemHelper.install_tasks
 
 task default: :test
